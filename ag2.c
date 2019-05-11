@@ -253,9 +253,9 @@ static int test8(void){
     for (int i = 0; i < 64; i++){
         pthread_create(&tid1, NULL,  &_thread_inc8, NULL);
     }
-
+    printf("passed first\n");
     while(a8 != 228);
-
+    printf("didn't pass second\n");
     return PASS;
 
 }
