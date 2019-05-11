@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <semaphore.h>
+
+enum status{RUNNING, BLOCKED, READY};
 
 int initHappened = 0;
 
@@ -14,6 +17,7 @@ int availID[129] = {0};
 //Structure that holds info about the thread. Need an array of these.   
 typedef struct ThreadControlBlock{
     pthread_t tid;
+	enum status stat;
     jmp_buf jbuf;
     char* sp;
     void* (*startFunc) (void*);
@@ -78,7 +82,8 @@ void schedule(){
 void wrapper(){
 	printf("entered wrapper for thread %d\n", head->block->tid);
     (*(head->block->startFunc))(head->block->arg);
-    //printf("Returned from function\n");
+   	printf("exiting wrapper for thread %d\n", head->block->tid);
+
     pthread_exit(0);
 }
 

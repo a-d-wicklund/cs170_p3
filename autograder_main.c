@@ -239,15 +239,15 @@ static int test7(void){
 
     pthread_create(&tid, NULL,  &_thread_lock_test, NULL);
 
-    lock(); // need to lock after init is called
-    l = 10;
-    sleep(1);
+    lock(); // need to lock after init is called, but before the first thread is scheduled
+    l = 10; 
+    sleep(1); //Allow the scheduler enough time to schedule. If lock is done right, it won't reschedule
 
     if (l != 10)
         return FAIL;
-    unlock();
+    unlock(); //Now, let the scheduler start up again and schedule the thread. 
     
-    pthread_join(tid, NULL);
+    pthread_join(tid, NULL); //wait until the one thread is done. 
 
     if (l != 20)
         return FAIL;
