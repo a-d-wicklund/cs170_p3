@@ -7,10 +7,10 @@
 #include <string.h>
 #include <semaphore.h>
 
-enum status{RUNNING, BLOCKED, READY};
+enum status{RUNNING, BLOCKED, TERMINATED};
 
 int initHappened = 0;
-
+int curID = 1;
 int availID[129] = {0};
 
 
@@ -18,6 +18,8 @@ int availID[129] = {0};
 typedef struct ThreadControlBlock{
     pthread_t tid;
 	enum status stat;
+	void *retval;
+	int joinedBy;
     jmp_buf jbuf;
     char* sp;
     void* (*startFunc) (void*);
@@ -34,11 +36,16 @@ lq* head;
 lq* tail;
 
 pthread_t createID(){
-    pthread_t i = 1;
+    /*pthread_t i = 1;
     while(availID[i] == -1)
         i++;
     availID[i] = -1;
-    return i;
+    */
+	while(availID[curID] == -1){
+		curID = (curID+1)%130;
+	}
+	availID[curID] = -1;
+    return curID; 
 }
 
 pthread_t pthread_self(){
@@ -63,7 +70,7 @@ static long int i64_ptr_mangle(long int p)
 void schedule(){
 	printf("Entered scheduler. Saving state of tid %d\n",head->block->tid);
 	if(setjmp(head->block->jbuf) == 0){
-		
+		lq* = findNextValid(&(head->next));
         if(head->next != NULL){//Put current head at the end, change head to next
             tail->next = head;
             head = head->next;
@@ -87,7 +94,26 @@ void wrapper(){
     pthread_exit(0);
 }
 
+int pthread_join(pthread_t thread, void **valueptr){
+	//Check if the thread with the thread id has been linked to this thread, meaning it has exited. If not, block and exit.
+	lq* node = findNodeByID(thread);
+	if(node->block->status != TERMINATED){
+		node->block->joinedBy = pthread_self();
+		head->block->status = BLOCKED;
+		if(setjmp(head->block->jbuf) == 0){
+			longjmp(
 
+		}
+	}
+	valueptr = &(node->block->retval); //save the return value 
+	availID[head->block->tid] = 0;
+	//lq* tmp = head;
+   	free(head->block->sp);
+   	free(head->block);
+   	head = head->next;
+	//free(tmp);
+
+}
 
 void pthread_init(){
     
@@ -96,6 +122,7 @@ void pthread_init(){
    
 	head->block = malloc(sizeof(struct ThreadControlBlock));
 	head->block->tid = (pthread_t) 0;
+	availID[0] = -1;
 
 	tail = head;
     printf("Main's node's pointer is %p\n",head);
@@ -154,13 +181,13 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start_
 }
 void pthread_exit(void *retval){
     printf("Exiting thread  %d. Next up, %d\n", head->block->tid, head->next->block->tid);
-	availID[head->block->tid] = 0;
-	//lq* tmp = head;
-    free(head->block->sp);
-    free(head->block);
-    head = head->next;
-	//free(tmp);
     //printf("head should be null but is %p\n", head);
+    //TODO: Check if there is another thread waiting to join. If so, wake it up. If not, just change the
+    //status to TERMINATED. 
+    if(head->block->joinWaiting != -1){
+		lq* n = findNodeByID(head->block->joinWaiting);
+		n->block->status = RUNNING;
+	}
     if(head == NULL){
         exit(0);
     }
@@ -171,5 +198,32 @@ void pthread_exit(void *retval){
     while(1);
 }
 
+lq* findNodeByID(int tid){
+
+	lq* cur = head;
+	int id = cur->block->tid;
+	while(tid != id){
+		if(cur->next == NULL) //Reached the end without finding thread
+			return NULL;
+		cur = cur->next;
+		id = cur->block->tid;
+	}
+	return cur;
+}
 
 
+lq* findNextValid(lq** in){
+	lq* cur = *in;
+	while(cur->next != NULL && cur->next->block->status != RUNNING)
+		cur = cur->next;
+	if(cur->block->status == RUNNING)
+		return cur;
+	else
+		return *in;
+	//What if there isn't a running block in the whole queue? This should be handled now. 
+}
+lq* findNextValid(lq** in){
+	//This function finds the next running thread and 
+
+
+}
