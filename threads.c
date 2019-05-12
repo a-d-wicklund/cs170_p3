@@ -70,13 +70,7 @@ static long int i64_ptr_mangle(long int p)
 void schedule(){
 	printf("Entered scheduler. Saving state of tid %d\n",head->block->tid);
 	if(setjmp(head->block->jbuf) == 0){
-		lq* = findNextValid(&(head->next));
-        if(head->next != NULL){//Put current head at the end, change head to next
-            tail->next = head;
-            head = head->next;
-            tail = tail->next;
-            tail->next = NULL;
-		}
+		findNextValid(head->next);
 		printf("about to jump to thread with ID %d and function at %p\n", head->block->tid, head->block->startFunc); 
 		longjmp(head->block->jbuf,1);
     }
@@ -100,12 +94,11 @@ int pthread_join(pthread_t thread, void **valueptr){
 	if(node->block->status != TERMINATED){
 		node->block->joinedBy = pthread_self();
 		head->block->status = BLOCKED;
-		if(setjmp(head->block->jbuf) == 0){
-			longjmp(
-
-		}
+		usleep(50); //THIS IS A TEMPORARY FIX. Allows the scheduler to come back in
 	}
+	//This happens once the thread has been reawakened
 	valueptr = &(node->block->retval); //save the return value 
+	//Clean up the memory
 	availID[head->block->tid] = 0;
 	//lq* tmp = head;
    	free(head->block->sp);
@@ -125,6 +118,7 @@ void pthread_init(){
 	availID[0] = -1;
 
 	tail = head;
+	tail->next = head;
     printf("Main's node's pointer is %p\n",head);
 	
 	struct sigaction sigact;
@@ -150,7 +144,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start_
     //Set the new block to be the tail
  	tail->next = tmp;
 	tail = tail->next;
-	tail->next = NULL; 
+	tail->next = head; 
 	tail->block = malloc(sizeof(struct ThreadControlBlock));			
 
 	pthread_t nextID = createID();
@@ -184,11 +178,13 @@ void pthread_exit(void *retval){
     //printf("head should be null but is %p\n", head);
     //TODO: Check if there is another thread waiting to join. If so, wake it up. If not, just change the
     //status to TERMINATED. 
+	head->block->status = TERMINATED;
+	head->block->retval = retval;
     if(head->block->joinWaiting != -1){
-		lq* n = findNodeByID(head->block->joinWaiting);
-		n->block->status = RUNNING;
+		lq* n = findNodeByID(head->block->joinWaiting); //Find the tcb for the thread that is waiting to join 
+		n->block->status = RUNNING; //Change the status of that thread to RUNNING (Wake it up)
 	}
-    if(head == NULL){
+    if(head->next = head){ //If last thread called exit, exit the process
         exit(0);
     }
     else
@@ -203,7 +199,7 @@ lq* findNodeByID(int tid){
 	lq* cur = head;
 	int id = cur->block->tid;
 	while(tid != id){
-		if(cur->next == NULL) //Reached the end without finding thread
+		if(cur->next == head) //Reached the end without finding thread
 			return NULL;
 		cur = cur->next;
 		id = cur->block->tid;
@@ -212,18 +208,12 @@ lq* findNodeByID(int tid){
 }
 
 
-lq* findNextValid(lq** in){
+//Find the next thread with status RUNNING and move the head pointer to that thread
+lq* findNextValid(lq* in){
 	lq* cur = *in;
-	while(cur->next != NULL && cur->next->block->status != RUNNING)
-		cur = cur->next;
-	if(cur->block->status == RUNNING)
-		return cur;
-	else
-		return *in;
-	//What if there isn't a running block in the whole queue? This should be handled now. 
-}
-lq* findNextValid(lq** in){
-	//This function finds the next running thread and 
-
-
+	while(head->block->status != RUNNING){
+		head = head->next; 
+		tail = tail->next; //tail should always be one behind head
+	}
+	//What if there isn't a running block in the whole queue? 
 }
