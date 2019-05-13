@@ -2,17 +2,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-void* func(int *input){
-	printf("in function\n");
-    int i = 0;
-	//while(1);
-        //if (i++ % 1000000 == 0)
-        printf("%d\n",1);
-        //usleep(10000);
-        i++;
-	//}
-}
-
 
 void* func2(int *input){
 	printf("in function\n");
@@ -25,6 +14,24 @@ void* func2(int *input){
         //i++;
 	//}
 }
+
+
+void* func(int *input){
+	printf("in function\n");
+    int i = 0;
+	//while(1);
+        //if (i++ % 1000000 == 0)
+        char a = 'a';
+        pthread_t thread;
+		pthread_create(&thread, NULL, &func2, &a);
+        printf("%d\n",1);
+        //usleep(10000);
+        i++;
+	//}
+}
+
+
+
 void* func3(int *input){
 	printf("in function\n");
     int i = 0;
@@ -50,9 +57,9 @@ int main(){
     //pthread_create(&thread3, NULL, &func3, &in2);
     //printf("Thread ID: %d\n", pthread_self());
     int i = 0;
-	for(i = 0; i < 5; i++){
+	//for(i = 0; i < 5; i++){
 		pthread_create(&thread, NULL, &func, &in);
-	}
+	//}
 	while(1) {
         //if (i++ % 1000000 == 0)
         //printf("%d\n",i);
