@@ -23,7 +23,7 @@
 #define PASS 1
 #define FAIL 0
 
-//#define _DEBUG
+#define _DEBUG
 #define TEST_WAIT_MILI 2000 // how many miliseconds do we wait before assuming a test is hung
 
 void lock();
@@ -269,7 +269,8 @@ static int test7(void){
  */
 
 
-static int (*test_arr[NUM_TESTS])(void) = {&test0, &test1, &test2, &test3, &test4, &test5, &test6, &test7};
+//static int (*test_arr[NUM_TESTS])(void) = {&test0, &test1, &test2, &test3, &test4, &test5, &test6, &test7};
+static int (*test_arr[2])(void) = {&test0, &test1};
 
 
 int main(void){
