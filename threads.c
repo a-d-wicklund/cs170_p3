@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <errno.h>
 #include <semaphore.h>
 //#include <threads.h>
 
@@ -164,6 +165,8 @@ int pthread_join(pthread_t thread, void **valueptr){
 	//Check if the thread with the thread id has been linked to this thread, meaning it has exited. If not, block and exit.
 	printf("inside pthread_join for thread %d\n",thread);
 	lq* node = findNodeByID(thread);
+	if(node == NULL)
+		return ESRCH;
 	if(node->block->stat != TERMINATED){
 		node->block->joinedBy = pthread_self();
 		head->block->stat = BLOCKED;
