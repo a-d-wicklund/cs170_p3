@@ -34,6 +34,14 @@ typedef struct LinkedQueue{
     tcb* block;
 }lq;
 
+typedef struct Semaphore{
+	long int count;
+	lq *lqhead;
+	lq *lqtail;
+	int tcount;
+}semstruct;
+
+//Global pointers to the head and tail of the linked list (queue)
 lq* head;
 lq* tail;
 
@@ -51,31 +59,103 @@ void unlock(){
 	//Allow all signals to interrupt again. 
 	sigset_t sigs;
 	sigemptyset(&sigs);
-	sigprocmask(SIG_BLOCK,&sigs,NULL); //Immediately unblock all signals. Will this cause the unlock function to get interrupted?
+	sigaddset(&sigs, SIGALRM);
 	useconds_t t = ualarm(0,0); //Time remaining 
 	//If time remaining is zero, the signal occured while in the critical section. reschedule immediately
-	if(t == 0){
+	
+	if(t == 0 && initHappened){
 		schedule();
 	}
 	//Otherwise, start up the timer again. 
 	else{
 		ualarm(t,0);
 	}
+	//Let the signals ingterrupt
+	sigprocmask(SIG_UNBLOCK,&sigs,NULL); //Immediately unblock all signals. Will this cause the unlock function to get interrupted?
+
 }
 
+
 int sem_init(sem_t *sem, int pshared, unsigned int value){
+	//Initialize a semaphore struct, initialize the linked list head and tail pointers
+	semstruct *sema = malloc(sizeof(semstruct));
+	sema->lqtail = NULL;
+	sema->lqhead = NULL;
+
+
+	sema->count = value;
+	sema->tcount = 0;
+	
+	sem->__align = (long int) sema;
+
 	return 0;
 }
 
 int sem_destroy(sem_t *sem){
+	//TODO: locate the semaphore struct by going to the address stored in sem
+	semstruct *sema = (semstruct *)sem->__align;
+
+	while(sema->lqhead != NULL){
+		lq* tmp = sema->lqhead;
+		sema->lqhead = sema->lqhead->next;
+		free(tmp->block->sp);
+		free(tmp->block);
+		free(tmp);
+	}
+	free(sema);
 	return 0;
 }
 
 int sem_wait(sem_t *sem){
+
+	semstruct *sema = (semstruct *)sem->__align;
+
+	if(sema->count == 0){
+		if(sema->tcount == 0){
+			//Insert at start of queue
+			sema->lqtail = malloc(sizeof(lq));
+			sema->lqtail->next = NULL;
+			sema->lqtail->block = head->block;
+			sema->lqhead = sema->lqtail;
+		}
+		else{
+			//Insert anywhere else
+			lq *tmp = malloc(sizeof(lq));
+			tmp->block = head->block;
+			tmp->next = NULL;
+			sema->lqtail->next = tmp;
+			sema->lqtail = sema->lqtail->next;
+		}
+		sema->tcount++;
+		//Block the calling thread from running and go back to the scheduler
+		head->block->stat = BLOCKED;
+		schedule();
+	}
+	else
+		sema->count--;
+	
+
 	return 0;
 }
 
 int sem_post(sem_t *sem){
+	//If there are any threads waiting on this semaphore, unblock one of them and remove them from the list
+	semstruct *sema = (semstruct *)sem->__align;
+
+	//If there is anything in the thread list, set it to RUNNING and remove it from the list.
+	if(sema->lqhead != NULL){
+		sema->lqhead->block->stat = RUNNING;
+		lq* tmp = sema->lqhead;
+		sema->lqhead = sema->lqhead->next;
+		free(tmp->block->sp);
+		free(tmp->block);
+		free(tmp);
+		sema->tcount--;
+	}
+	else
+		sema->count++;
+	
+	
 	return 0;
 }
 
@@ -102,11 +182,13 @@ int findNextValid(){
 		head = head->next; 
 		tail = tail->next; //tail should always be one behind head
 		//If head has made it all the way past original head, exit
-		if(head == origHead)
+		if(head == origHead){
+			//unlock();
 			return 0;
+		}
 	}
-	return 1;
 	//unlock();
+	return 1;
 	//What if there isn't a running block in the whole queue? 
 }
 
@@ -116,13 +198,17 @@ lq* findNodeByID(int tid){
 	lq* cur = head;
 	int id = cur->block->tid;
 	while(tid != id){
-		if(cur->next == head) //Reached the end without finding thread
+		if(cur->next == head){
+			//unlock();
 			return NULL;
+		} 
+			
 		cur = cur->next;
 		id = cur->block->tid;
 	}
-	return cur;
 	//unlock();
+	return cur;
+	
 }
 
 
@@ -179,13 +265,18 @@ void wrapper(){
 }
 
 int pthread_join(pthread_t thread, void **valueptr){
-	if(thread == head->block->tid)
-		return EDEADLK;
 	lock();
-	printf("inside pthread_join for thread %d\n",thread);
+
+	if(thread == head->block->tid){
+		return EDEADLK;
+	}
+	printf("\ninside pthread_join for thread %d\n",thread);
 	lq* node = findNodeByID(thread);
-	if(node == NULL)
+	if(node == NULL){
+		unlock();
 		return ESRCH;
+	}
+		
 	if(node->block->stat != TERMINATED){
 		node->block->joinedBy = pthread_self();
 		head->block->stat = BLOCKED;
@@ -194,13 +285,14 @@ int pthread_join(pthread_t thread, void **valueptr){
 		printf("rescheduling\n");
 		schedule();
 	}
-	printf("Came back to pthread_join(). About to save return from thread %d\n", thread);	
+	printf("\nCame back to pthread_join(). About to save return from thread %d\n", thread);	
 	if(valueptr != NULL)
 		*valueptr = node->block->retval; //save the return value
 	printf("save return value\n");
 	node->block->stat = TRASH; //This may cause problems later. revisit
-	return 0;
 	unlock();
+	return 0;
+	
 }
 
 void pthread_init(){
