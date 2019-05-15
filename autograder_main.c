@@ -23,7 +23,7 @@
 #define PASS 1
 #define FAIL 0
 
-#define _DEBUG
+//#define _DEBUG
 #define TEST_WAIT_MILI 2000 // how many miliseconds do we wait before assuming a test is hung
 
 void lock();

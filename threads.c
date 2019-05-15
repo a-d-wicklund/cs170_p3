@@ -15,6 +15,7 @@ int initHappened = 0;
 int curID = 1;
 int availID[129] = {0};
 
+void schedule();
 
 //Structure that holds info about the thread. Need an array of these.   
 typedef struct ThreadControlBlock{
@@ -39,11 +40,24 @@ lq* tail;
 
 
 void lock(){
+	//Block the SIGALRM signal 
+	struct sigaction sigact;
+	sigemptyset(&sigact.sa_mask);
+	sigaddset(&sigact.sa_mask, SIGALRM);
 
 }
 
 void unlock(){
-
+	//Allow all signals to interrupt again. 
+	struct sigaction sigact;
+	useconds_t t = ualarm(0,0); //Time remaining 
+	sigemptyset(&sigact.sa_mask);
+	if(t == 0){
+		schedule();
+	}
+	else{
+		ualarm(t,0);
+	}
 }
 
 int sem_init(sem_t *sem, int pshared, unsigned int value){
@@ -180,7 +194,9 @@ int pthread_join(pthread_t thread, void **valueptr){
 	//Problem: valueptr is going to point to the address of something in a 
 	//node that is about to be deleted. I have to put it in something that can be
 	//seen from anywhere. 
-	valueptr = &(node->block->retval); //save the return value
+	if(valueptr != NULL)
+		*valueptr = node->block->retval; //save the return value
+	printf("save return value\n");
 	//printf("The value that is pointed by value pointer is %d\n",**((int **)(valueptr)));
 	node->block->stat = TRASH;
 	return 0;
