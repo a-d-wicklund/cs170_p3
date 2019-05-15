@@ -239,15 +239,15 @@ static int test7(void){
 
     pthread_create(&tid, NULL,  &_thread_lock_test, NULL);
 
-    lock(); // need to lock after init is called, but before the first thread is scheduled
-    l = 10; 
-    sleep(1); //Allow the scheduler enough time to schedule. If lock is done right, it won't reschedule
+    lock(); // need to lock after init is called
+    l = 10;
+    sleep(1);
 
     if (l != 10)
         return FAIL;
-    unlock(); //Now, let the scheduler start up again and schedule the thread. 
+    unlock();
     
-    pthread_join(tid, NULL); //wait until the one thread is done. 
+    pthread_join(tid, NULL);
 
     if (l != 20)
         return FAIL;
@@ -269,8 +269,7 @@ static int test7(void){
  */
 
 
-//static int (*test_arr[NUM_TESTS])(void) = {&test0, &test1, &test2, &test3, &test4, &test5, &test6, &test7};
-static int (*test_arr[2])(void) = {&test0, &test1};
+static int (*test_arr[NUM_TESTS])(void) = {&test0, &test1, &test2, &test3, &test4, &test5, &test6, &test7};
 
 
 int main(void){

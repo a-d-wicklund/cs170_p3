@@ -180,10 +180,10 @@ int pthread_join(pthread_t thread, void **valueptr){
 	//Problem: valueptr is going to point to the address of something in a 
 	//node that is about to be deleted. I have to put it in something that can be
 	//seen from anywhere. 
-	void *tmp = node->block->retval;
-	valueptr = &(node->block->retval); //save the return value 
+	valueptr = &(node->block->retval); //save the return value
 	//printf("The value that is pointed by value pointer is %d\n",**((int **)(valueptr)));
 	node->block->stat = TRASH;
+	return 0;
 }
 
 void pthread_init(){
