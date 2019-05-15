@@ -24,7 +24,7 @@
 #define FAIL 0
 
 //#define _DEBUG
-#define TEST_WAIT_MILI 2000 // how many miliseconds do we wait before assuming a test is hung
+#define TEST_WAIT_MILI 7000 // how many miliseconds do we wait before assuming a test is hung
 
 void lock();
 void unlock();

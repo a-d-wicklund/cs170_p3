@@ -57,10 +57,11 @@ void lock(){
 
 void unlock(){
 	//Allow all signals to interrupt again. 
+	useconds_t t = ualarm(0,0); //Time remaining 
 	sigset_t sigs;
 	sigemptyset(&sigs);
 	sigaddset(&sigs, SIGALRM);
-	useconds_t t = ualarm(0,0); //Time remaining 
+	sigprocmask(SIG_UNBLOCK,&sigs,NULL); //Immediately unblock all signals.
 	//If time remaining is zero, the signal occured while in the critical section. reschedule immediately
 	
 	if(t == 0 && initHappened){
@@ -71,7 +72,7 @@ void unlock(){
 		ualarm(t,0);
 	}
 	//Let the signals ingterrupt
-	sigprocmask(SIG_UNBLOCK,&sigs,NULL); //Immediately unblock all signals. Will this cause the unlock function to get interrupted?
+	
 
 }
 
@@ -241,6 +242,7 @@ static long int i64_ptr_mangle(long int p)
 }
 
 void schedule(){
+	lock();
 	ualarm(50000,0);
 	printf("Entered scheduler. Saving state of tid %d\n",head->block->tid);
 	if(setjmp(head->block->jbuf) == 0){
@@ -251,6 +253,7 @@ void schedule(){
     }
     else{
 		printf("why\n");
+		unlock();
         return;
     }
 
