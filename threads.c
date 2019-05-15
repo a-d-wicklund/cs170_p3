@@ -29,7 +29,6 @@ typedef struct ThreadControlBlock{
     void* arg;
 }tcb;
 
-
 typedef struct LinkedQueue{
     struct LinkedQueue* next;
     tcb* block;
@@ -41,20 +40,24 @@ lq* tail;
 
 void lock(){
 	//Block the SIGALRM signal 
-	struct sigaction sigact;
-	sigemptyset(&sigact.sa_mask);
-	sigaddset(&sigact.sa_mask, SIGALRM);
+	sigset_t sigs;
+	sigemptyset(&sigs);
+	sigaddset(&sigs, SIGALRM);
+	sigprocmask(SIG_BLOCK,&sigs,NULL);
 
 }
 
 void unlock(){
 	//Allow all signals to interrupt again. 
-	struct sigaction sigact;
+	sigset_t sigs;
+	sigemptyset(&sigs);
+	sigprocmask(SIG_BLOCK,&sigs,NULL); //Immediately unblock all signals. Will this cause the unlock function to get interrupted?
 	useconds_t t = ualarm(0,0); //Time remaining 
-	sigemptyset(&sigact.sa_mask);
+	//If time remaining is zero, the signal occured while in the critical section. reschedule immediately
 	if(t == 0){
 		schedule();
 	}
+	//Otherwise, start up the timer again. 
 	else{
 		ualarm(t,0);
 	}
@@ -81,6 +84,7 @@ int sem_post(sem_t *sem){
 int findNextValid(){
 	//lq* cur = in;
 	printf("Finding next running thread\n");
+	//lock();
 	lq* origHead = head->next;
 	head = head->next;
 	tail = tail->next;
@@ -102,11 +106,13 @@ int findNextValid(){
 			return 0;
 	}
 	return 1;
+	//unlock();
 	//What if there isn't a running block in the whole queue? 
 }
 
 lq* findNodeByID(int tid){
 
+	//lock();
 	lq* cur = head;
 	int id = cur->block->tid;
 	while(tid != id){
@@ -116,15 +122,12 @@ lq* findNodeByID(int tid){
 		id = cur->block->tid;
 	}
 	return cur;
+	//unlock();
 }
 
 
 pthread_t createID(){
-    /*pthread_t i = 1;
-    while(availID[i] == -1)
-        i++;
-    availID[i] = -1;
-    */
+  
 	while(availID[curID] == -1){
 		curID = (curID+1)%130;
 	}
@@ -176,7 +179,9 @@ void wrapper(){
 }
 
 int pthread_join(pthread_t thread, void **valueptr){
-	//Check if the thread with the thread id has been linked to this thread, meaning it has exited. If not, block and exit.
+	if(thread == head->block->tid)
+		return EDEADLK;
+	lock();
 	printf("inside pthread_join for thread %d\n",thread);
 	lq* node = findNodeByID(thread);
 	if(node == NULL)
@@ -189,17 +194,13 @@ int pthread_join(pthread_t thread, void **valueptr){
 		printf("rescheduling\n");
 		schedule();
 	}
-	printf("Came back to pthread_join(). About to save return from thread %d\n", thread);
-	//This happens once the thread has been reawakened
-	//Problem: valueptr is going to point to the address of something in a 
-	//node that is about to be deleted. I have to put it in something that can be
-	//seen from anywhere. 
+	printf("Came back to pthread_join(). About to save return from thread %d\n", thread);	
 	if(valueptr != NULL)
 		*valueptr = node->block->retval; //save the return value
 	printf("save return value\n");
-	//printf("The value that is pointed by value pointer is %d\n",**((int **)(valueptr)));
-	node->block->stat = TRASH;
+	node->block->stat = TRASH; //This may cause problems later. revisit
 	return 0;
+	unlock();
 }
 
 void pthread_init(){
@@ -254,8 +255,6 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start_
 	printf("Creating thread with ID %d\n",nextID);
 
 	printf("List is: %d %d %d ... %d %d\n",head->block->tid, head->next->block->tid, head->next->next->block->tid, tail->block->tid, tail->next->block->tid);
-    //printf("tmp points to address %p\nhead points to address %p\ntail points to address %p\n",tmp->block->tid, head->block->tid, tail->block->tid);
-	//printf("Tail after adding new: %d\nHead after adding new: %d\n",tail->block->tid, head->block->tid); 
 
 	tail->block->startFunc = start_routine;
 	tail->block->arg = arg;
@@ -267,7 +266,6 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start_
 		//set the PC and stacl pointer to address of wrapper function and top of stack, respectively
    		*((long*) (&(tail->block->jbuf))+6) = i64_ptr_mangle((long)stackTop);
     	*((long*) (&(tail->block->jbuf))+7) = i64_ptr_mangle((long)&wrapper);
-		//printf("after mangle\n");
 	}
 	else{
 		pthread_exit(0);
